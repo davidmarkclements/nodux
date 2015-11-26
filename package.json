@@ -1,0 +1,28 @@
+{
+  "name": "nodux",
+  "version": "2.6.0",
+  "description": "run node in a tiny container",
+  "main": "index.js",
+  "bin": {
+    "nodux": "cli.js"
+  },
+  "scripts": {
+    "test": "standard"
+  },
+  "author": "David Mark Clements",
+  "license": "MIT",
+  "dependencies": {
+    "cat-names": "^1.0.2",
+    "daemonspawn": "^1.0.1",
+    "keypair": "^1.0.0",
+    "minimist": "^1.2.0",
+    "mkdirp": "^0.5.1",
+    "node-forge": "^0.6.34",
+    "nodux-core": "0.0.1",
+    "nugget": "^1.5.4",
+    "psjson": "^0.1.0"
+  },
+  "devDependencies": {
+    "standard": "^5.2.2"
+  }
+}

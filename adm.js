@@ -13,13 +13,24 @@ var psjson = require('psjson')
 var minimist = require('minimist')
 var argv = minimist(process.argv.slice(2), {boolean: true})
 
-handle(argv._, argv)
+if (!module.parent) {
+  return adm(argv._, argv)
+}
 
-function handle (cmds, opts) {
+module.exports = adm
+
+function adm(cmds, opts, done) {
+  cmds = !Array.isArray(cmds) ? [cmds] : cmds
+  if (opts instanceof Function) {
+    done = opts
+    opts = null
+  }
+  opts = opts || {}
+
   // needs yosemite 10.10.3 or above for xhyve
   if (os.platform() !== 'darwin' || os.release() < '14.3.0') return console.error('Error: Mac OS Yosemite 10.10.3 or above required')
 
-  var dir = opts.path || opts.p || path.join(process.cwd(), 'linux')
+  var dir = opts.path || opts.p || path.join(__dirname, 'linux')
   if (!opts.stderr) opts.stderr = path.join(dir, 'stderr.log')
   if (!opts.stdout) opts.stdout = path.join(dir, 'stdout.log')
   var linuxPid = opts.pid || path.join(dir, 'linux.pid')
@@ -30,7 +41,7 @@ function handle (cmds, opts) {
   var cmd = cmds[0]
   if (typeof cmd === 'undefined') {
     return console.log(
-      'Usage:     linux <command> [args...]\n' +
+      'Usage:     nodux adm <command> [args...]\n' +
       '\n' +
       'Commands:\n' +
       '  init     creates a new ./linux folder in this directory to hold config\n' +
@@ -56,8 +67,7 @@ function handle (cmds, opts) {
   }
 
   if (cmd === 'boot') {
-    // capability checks
-    if (process.getuid() !== 0) return console.error('Error: must run boot with sudo')
+
 
     // ensure linux folder exists
     if (!fs.existsSync(dir)) return console.log('Error: no linux config folder found, run linux init first')
@@ -102,7 +112,11 @@ function handle (cmds, opts) {
   if (cmd === 'ip') {
     var hostname = fs.readFileSync(linuxHostname).toString()
     parseIp(hostname, function (err, ip) {
-      if (err) throw err
+      if (err) {
+        if (done) return done(err)
+        throw err
+      }
+      if (done) return done(null, {ip: ip})
       console.log(ip)
     })
     return
@@ -115,15 +129,18 @@ function handle (cmds, opts) {
   if (cmd === 'run') {
     // run is special, we want to forward raw args to ssh
     var runIdx
-    for (var i = 0; i < process.argv.length; i++) {
-      if (process.argv[i] === 'run') {
+    var args = module.parent ? cmds : process.argv;
+
+    for (var i = 0; i < args.length; i++) {
+      if (args[i] === 'run') {
         runIdx = i
         break
       }
     }
     // reparse argv so we don't include any run args
-    argv = minimist(process.argv.slice(0, runIdx + 1), {boolean: true})
-    return ssh(process.argv.slice(runIdx + 1))
+    argv = minimist(args.slice(0, runIdx + 1), {boolean: true})
+
+    return ssh(args.slice(runIdx + 1))
   }
 
   if (cmd === 'halt') {
@@ -150,8 +167,19 @@ function handle (cmds, opts) {
 
   function getStatus (pid) {
     daemon.status(pid, function (err, running) {
-      if (err) throw err
-      if (running) return console.error('Linux is already running')
+      if (err) {
+        if (done) { return done(err) }
+        throw err
+      } 
+      var e = 'Linux is already running'
+      if (running) {
+        if (done) {
+          e = Error(e)
+          e.code = 418
+          return done(e)
+        }
+        return console.error(e)
+      }
       boot()
     })
   }
@@ -193,6 +221,7 @@ function handle (cmds, opts) {
           return
         }
         if (!ip) return setTimeout(check, 1000)
+        if (done) return done(null, {ip: ip, hostname: hostname, pid: pid})
         console.log('Linux has booted', {ip: ip, hostname: hostname, pid: pid})
       })
     }
@@ -223,7 +252,8 @@ function handle (cmds, opts) {
       if (argv.tty || argv.t) args.unshift('-t')
       if (commands) args = args.concat(commands)
       if (opts.debug) console.error('spawning', 'ssh', args)
-      child.spawn('ssh', args, {stdio: 'inherit'})
+      var proc = child.spawn('ssh', args, {stdio: 'inherit'})
+      if (done) done()
     })
   }
 
@@ -246,8 +276,8 @@ function handle (cmds, opts) {
   }
 
   function createBootArgs (host, key) {
-    var kernel = __dirname + '/vmlinuz64'
-    var initrd = __dirname + '/initrd.gz'
+    var kernel = __dirname + '/node_modules/nodux-core/os/vmlinuz64'
+    var initrd = __dirname + '/node_modules/nodux-core/os/initrd.gz'
     var keyString = '\\"' + fs.readFileSync(key + '.pub').toString().trim() + '\\"'
     var cmdline = 'earlyprintk=serial host=' + host + ' sshkey=' + keyString
     var args = [

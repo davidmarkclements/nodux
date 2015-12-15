@@ -16,6 +16,7 @@ module.exports = hostfs
 function hostfs(opts, cb, dc) { 
   opts = opts || {}
   opts.host = opts.host || process.argv.slice(2)[0]
+  opts.envMapPath = opts.envMapPath || process.argv.slice(2)[1] || ''
   var from = '/'
 
   var stream = rfuse({
@@ -53,6 +54,7 @@ function hostfs(opts, cb, dc) {
     },
     open: function (path, mode, cb) {
       log('open', path, mode)
+      if (path.substr(0, 4) === '/env') path = opts.envMapPath + path
       fs.open(join(from, path), mode, cb)
     },
     truncate: function (path, size, cb) {
@@ -61,6 +63,7 @@ function hostfs(opts, cb, dc) {
     },
     read: function (path, fd, buffer, len, pos, cb) {
       log('read', path, fd, len, pos)
+      if (path.substr(0, 4) === '/env') path = opts.envMapPath + path
       fs.read(fd, buffer, 0, len, pos, cb)
     },
     write: function (path, fd, buffer, len, pos, cb) {
@@ -69,6 +72,7 @@ function hostfs(opts, cb, dc) {
     },
     readdir: function (path, cb) {
       log('readdir', path)
+      if (path.substr(0, 4) === '/env') path = opts.envMapPath + path
       fs.readdir(join(from, path), cb)
     },
     fgetattr: function (path, fd, cb) {
@@ -77,6 +81,7 @@ function hostfs(opts, cb, dc) {
     },
     getattr: function (path, cb) {
       log('getattr', path)
+      if (path.substr(0, 4) === '/env') path = opts.envMapPath + path
       fs.lstat(join(from, path), cb)
     },
     chmod: function (path, mode, cb) {

@@ -4,14 +4,26 @@ var onExit = require('signal-exit')
 var adm = require('./adm')
 var path = require('path')
 var hostfs = require('./hostfs')
+var escapeRx = require('escape-regexp')
+var minimist = require('minimist')
 var flags = require('./flags')
-var args = require('minimist')(process.argv.slice(2))
-
 var fs = require('fs')
 var spawn = require('child_process').spawn
 var isSudo = require('is-sudo')
 var xhyve = path.join(__dirname, 'xhyve')
 var xhyveStat = fs.statSync(xhyve)
+
+var envFile = path.join(__dirname, 'env', process.pid + '') + '.json'
+
+var noduxEnvMap = {
+  //__NODUX_STDIN_EVAL : !process.isTTY()
+  __NODUX_EVAL__: ['e', 'eval', 'p', 'print'],
+  __NODUX_PRINT_EVAL_RESULT__: ['p', 'print'],
+  __NODUX_SYNTAX_CHECK_ONLY__: ['c', 'check'],
+  __NODUX_REPL__: ['i']
+}
+
+var excludeNativeFlags = ['-e', '--eval', '-p', '--print', '-c', '--check', '-i']
 
 
 if (xhyveStat.mode !== 36333 || xhyveStat.uid !== 0) {
@@ -45,56 +57,80 @@ function exec() {
     }
     if (err) { throw err }
 
-    hostfs({host: info.ip}, run, function dc() { 
-      throw Error('Panic: Hostfs disconnected from vm')
+    var _ = ' '
+    var sudo = 'sudo'
+    var node = 'node'
+    var nodux = '/usr/local/bin/nodux.js'
+    var cwd = process.cwd()
+    var env = JSON.stringify(process.env)
+    var file = minimist(process.argv.slice(2))._[0] || ''
+    var nativeFlags
+
+    if (file) {
+      nativeFlags = process.argv.slice(2).slice(0, process.argv.indexOf(file) - 2)
+    }
+
+    if (!file) {
+      var args = minimist(process.argv.slice(2))
+      nativeFlags = Object.keys(args)
+        .filter(isNativeFlag).map(function (f) {
+          if (!file && fs.existsSync(path.join(process.cwd(), args[f]))) {
+            file = args[f]
+            args[f] = true
+          }
+          return argStr(f, args[f])
+        })
+    }
+
+    var captureFlags = minimist(nativeFlags, {
+      alias: noduxEnvMap
     })
 
-    function run () {
-      var _ = ' '
-      
-      var node = 'sudo node'
-      var nativeFlags = Object.keys(args).filter(isNativeFlag).map(argStr)
-      var nodux = '/usr/local/bin/nodux.js'
-      var cwd = '"' + process.cwd() + '"'
-      var env = '\'' + JSON.stringify(process.env) + '\''
-      var file = args._[0] || ''
-      var appFlags = Object.keys(args).filter(isAppFlag).map(argStr).join(' ')
-      var appArgs = args._.slice(1)
-      var appInput = process.argv.slice(2).filter(function (arg, ix, args) {
-        var nativeFlag = nativeFlags.some(function (f) {
-          if (f === file) return false
-          if (f === arg || arg.replace(/_/g, '-') === f) return true
-          if (RegExp(arg).test(f) && RegExp(args[ix-1]).test(f)) return true
-          if (RegExp(arg).test(f) && RegExp(args[ix+1]).test(f)) return true
-        })
-        return !nativeFlag
-      }).join(' ')
+    var appInput = file ? process.argv.slice(process.argv.indexOf(file) + 1).join(' ') : ''
 
-      nativeFlags = nativeFlags.join(' ')
+    nativeFlags = nativeFlags.filter(function (f, ix) { 
+      return !~excludeNativeFlags.indexOf(f)  &&
+        (captureFlags[(nativeFlags[ix-1] || '').replace(/^-+/, '')] !== f)
+    }).join(' ')
+    
+    var envVars = Object.keys(captureFlags).reduce(function (o, f) {
+      if (/__NODUX_(.+)__/.test(f)) {
+        o[f] = captureFlags[f]
+      }
+      return o
+    }, {
+      NODUX_HOST_CWD: cwd,
+      NODUX_HOST_ENV: env
+    })
 
-      var cmd = node + _ + nativeFlags + _ + nodux + _ + cwd + _ + env + _ + file + _ + appInput
+    fs.writeFileSync(envFile, JSON.stringify(envVars))
+    var pid = 'PID=' + process.pid
+    var cmd = sudo + _ + pid + _ + node + _ + nativeFlags + _ + nodux + _ + file + _ + appInput
 
+    hostfs({host: info.ip, envMapPath: __dirname}, function run () {
       adm(['run', cmd], function (err, code) {
         process.exit(code)
       })
-    }
+    }, function dc() { 
+      throw Error('Panic: Hostfs disconnected from vm')
+    })
+
   })
 
 }
 
-function argStr(f) {
+onExit(function () { 
+  if (fs.existsSync(envFile)) { fs.unlinkSync(envFile) }
+})
+
+function argStr(f, v) {
   var dash = (f.length === 1) ? '-' : '--'
-  var prefix = (args[f] === false) ? 'no-' : ''
-  var suffix = (typeof args[f] === 'string') ? '=' + args[f] : ''
+  var prefix = (v === false) ? 'no-' : ''
+  var suffix = (typeof v === 'string') ? '=' + v : ''
   return dash + prefix + f + suffix
 }
 
 function isNativeFlag(f) {
   if (f === '_') return false
   return !!~flags.indexOf(f)
-}
-
-function isAppFlag(f) {
-  if (f === '_') return false
-  return !~flags.indexOf(f) 
 }

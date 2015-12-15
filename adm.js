@@ -263,7 +263,6 @@ function adm(cmds, opts, done) {
         })
       }
 
-
       var c = connect('tc@' + ip, {
         key: fs.readFileSync(keyPath),
         verify: false,
@@ -272,7 +271,7 @@ function adm(cmds, opts, done) {
 
       c.on('ready', function () {
         c.shell(function (err, stream) {
-          var cmd = commands.join(' ') + ' && exit $?'
+          var cmd = commands.join(' ') + '; exit $?'
           var output = ''
           stream.write('export PS1=""\n')
           stream.write('echo ready\n')
@@ -289,9 +288,13 @@ function adm(cmds, opts, done) {
                   process.stdin.setRawMode(true)
                   keypress(process.stdin)
                   terminal(stream)
-                  process.stdin.pipe(stream)
-                  stream.pipe(process.stdout)
                   stream.removeListener('data', ready)
+
+                  setImmediate(function () {
+                    process.stdin.pipe(stream)
+                    stream.pipe(process.stdout)  
+                  })
+                  
                 }
               })
             })

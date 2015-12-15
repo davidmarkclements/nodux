@@ -17,6 +17,7 @@
     "cat-names": "^1.0.2",
     "daemonspawn": "^1.0.1",
     "debug": "^2.2.0",
+    "escape-regexp": "0.0.1",
     "hyperfuse": "^0.1.0",
     "is-sudo": "^0.1.0",
     "keypair": "^1.0.0",

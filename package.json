@@ -18,14 +18,17 @@
     "daemonspawn": "^1.0.1",
     "debug": "^2.2.0",
     "hyperfuse": "^0.1.0",
+    "is-sudo": "^0.1.0",
     "keypair": "^1.0.0",
+    "keypress": "^0.2.1",
     "minimist": "^1.2.0",
     "mkdirp": "^0.5.1",
     "node-forge": "^0.6.34",
-    "nodux-core": "0.0.1",
-    "nugget": "^1.5.4",
+    "nodux-core": "0.0.9",
     "psjson": "^0.1.0",
-    "signal-exit": "^2.1.2"
+    "signal-exit": "^2.1.2",
+    "ssh-connect-prompt": "0.0.2",
+    "sudo": "^1.0.3"
   },
   "devDependencies": {
     "standard": "^5.2.2"

@@ -11,6 +11,8 @@ var forge = require('node-forge')
 var mkdirp = require('mkdirp')
 var psjson = require('psjson')
 var minimist = require('minimist')
+var connect = require('ssh-connect-prompt')
+var keypress = require('keypress')
 var argv = minimist(process.argv.slice(2), {boolean: true})
 
 if (!module.parent) {
@@ -248,14 +250,85 @@ function adm(cmds, opts, done) {
     parseIp(hostname, function (err, ip) {
       if (err) throw err
       if (!ip) return console.error('Error: Could not find ip for linux hostname', hostname)
+      // process.stdin.setRawMode(true)
       var args = ['-i', keyPath, '-o', 'StrictHostKeyChecking=no', '-o', 'LogLevel=ERROR', 'tc@' + ip]
       if (argv.tty || argv.t) args.unshift('-t')
       if (commands) args = args.concat(commands)
-      if (opts.debug) console.error('spawning', 'ssh', args)
-      var proc = child.spawn('ssh', args, {stdio: 'inherit'})
-      if (done) done()
+      if (opts.debug) console.error('starting', 'ssh', args)
+
+      if (!commands) {
+        return child.spawn('ssh', args, {stdio: 'inherit'}).on('close', function (code, signal) {
+          if (opts.debug) console.error('ssh session finished')
+          if (done) done()
+        })
+      }
+
+
+      var c = connect('tc@' + ip, {
+        key: fs.readFileSync(keyPath),
+        verify: false,
+        interactive: false
+      })
+
+      c.on('ready', function () {
+        c.shell(function (err, stream) {
+          var cmd = commands.join(' ') + ' && exit $?'
+          var output = ''
+          stream.write('export PS1=""\n')
+          stream.write('echo ready\n')
+          stream.on('data', function ready(c) {
+            if (c+'' !== 'ready') { return }
+
+            stream.removeListener('data', ready)
+            stream.once('data', function(c) {
+              stream.write(cmd + '\n')
+              stream.on('data', function ready(c) {
+                output += c
+                if (output.length < cmd.length) return
+                if (output.replace(/\r\r\n/g, '').trim().length === cmd.trim().length) {
+                  process.stdin.setRawMode(true)
+                  keypress(process.stdin)
+                  terminal(stream)
+                  process.stdin.pipe(stream)
+                  stream.pipe(process.stdout)
+                  stream.removeListener('data', ready)
+                }
+              })
+            })
+          })
+          stream.on('close', function() {
+            if (done) { return done() }
+            process.exit()
+          })
+        })
+
+      })
     })
   }
+
+  function terminal(stream) {
+    process.stdin.on('keypress', function (ch, key) {
+      if (!key) { 
+        return 
+      }
+      if (key.sequence) {
+        // return stream.write(key.sequence)
+      }
+      if (key && key.ctrl) {
+        if (key.name === 'c') {
+          // process.stdout.write('^C\n')
+          // process.exit()
+          process.stdin.write(Buffer([0x03]))
+          return
+        }
+        if (key.name === 'd') {
+          process.stdout.write('\n')
+          process.exit()
+        }
+      }
+    })
+  }
+
 
   function linuxStatus (cb) {
     readPid(function (err, pid) {

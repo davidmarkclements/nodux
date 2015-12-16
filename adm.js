@@ -250,7 +250,6 @@ function adm(cmds, opts, done) {
     parseIp(hostname, function (err, ip) {
       if (err) throw err
       if (!ip) return console.error('Error: Could not find ip for linux hostname', hostname)
-      // process.stdin.setRawMode(true)
       var args = ['-i', keyPath, '-o', 'StrictHostKeyChecking=no', '-o', 'LogLevel=ERROR', 'tc@' + ip]
       if (argv.tty || argv.t) args.unshift('-t')
       if (commands) args = args.concat(commands)
@@ -276,18 +275,24 @@ function adm(cmds, opts, done) {
           stream.write('export PS1=""\n')
           stream.write('echo ready\n')
           stream.on('data', function ready(c) {
+
             if (c+'' !== 'ready') { return }
 
             stream.removeListener('data', ready)
             stream.once('data', function(c) {
+
               stream.write(cmd + '\n')
               stream.on('data', function ready(c) {
                 output += c
                 if (output.length < cmd.length) return
                 if (output.replace(/\r\r\n/g, '').trim().length === cmd.trim().length) {
-                  process.stdin.setRawMode(true)
+                  if (process.stdin.setRawMode) {
+                    process.stdin.setRawMode(true)
+                  }
+                
                   keypress(process.stdin)
-                  terminal(stream)
+                  terminal(stream)  
+
                   stream.removeListener('data', ready)
 
                   setImmediate(function () {

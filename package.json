@@ -8,7 +8,8 @@
     "nodux-adm": "./adm.js"
   },
   "scripts": {
-    "test": "standard",
+    "test": "babel-tap test",
+    "cov": "babel-tap --cov test",
     "postinstall": "nodux-adm init"
   },
   "author": "David Mark Clements",
@@ -32,6 +33,9 @@
     "sudo": "^1.0.3"
   },
   "devDependencies": {
+    "babel-tap": "davidmarkclements/babel-tap#patch-1",
+    "node-promise-es6": "^0.2.3",
+    "npm-watch": "0.0.1",
     "standard": "^5.2.2"
   }
 }

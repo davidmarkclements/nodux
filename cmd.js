@@ -16,7 +16,7 @@ var xhyveStat = fs.statSync(xhyve)
 var envFile = path.join(__dirname, 'env', process.pid + '') + '.json'
 
 var noduxEnvMap = {
-  //__NODUX_STDIN_EVAL : !process.isTTY()
+  //__NODUX_STDIN_EVAL__ 
   __NODUX_EVAL__: ['e', 'eval', 'p', 'print'],
   __NODUX_PRINT_EVAL_RESULT__: ['p', 'print'],
   __NODUX_SYNTAX_CHECK_ONLY__: ['c', 'check'],
@@ -70,50 +70,82 @@ function exec() {
       nativeFlags = process.argv.slice(2).slice(0, process.argv.indexOf(file) - 2)
     }
 
+
     if (!file) {
       var args = minimist(process.argv.slice(2))
-      nativeFlags = Object.keys(args)
-        .filter(isNativeFlag).map(function (f) {
-          if (!file && fs.existsSync(path.join(process.cwd(), args[f]))) {
-            file = args[f]
-            args[f] = true
-          }
-          return argStr(f, args[f])
-        })
+      nativeFlags = Object.keys(args).filter(isNativeFlag)
+
+      console.log(nativeFlags)
+
+      process.argv.slice(2).forEach(function (f) {
+        if (!file && fs.existsSync(path.join(cwd, f))) {
+          file = f
+        }
+      }) 
+
+      nativeFlags = nativeFlags.reduce(function(a, f) {
+        a.push(f.length === 1 ? '-' + f : '--' + f)
+        a.push(args[f])
+        return a
+      }, []) 
     }
 
-    var captureFlags = minimist(nativeFlags, {
+    var captureFlags = minimist(nativeFlags, {  
       alias: noduxEnvMap
     })
 
-    var appInput = file ? process.argv.slice(process.argv.indexOf(file) + 1).join(' ') : ''
-
-    nativeFlags = nativeFlags.filter(function (f, ix) { 
-      return !~excludeNativeFlags.indexOf(f)  &&
-        (captureFlags[(nativeFlags[ix-1] || '').replace(/^-+/, '')] !== f)
-    }).join(' ')
-    
-    var envVars = Object.keys(captureFlags).reduce(function (o, f) {
-      if (/__NODUX_(.+)__/.test(f)) {
-        o[f] = captureFlags[f]
-      }
-      return o
-    }, {
-      NODUX_HOST_CWD: cwd,
-      NODUX_HOST_ENV: env
-    })
-
-    fs.writeFileSync(envFile, JSON.stringify(envVars))
-    var pid = 'PID=' + process.pid
-    var cmd = sudo + _ + pid + _ + node + _ + nativeFlags + _ + nodux + _ + file + _ + appInput
-
-    hostfs({host: info.ip, envMapPath: __dirname}, function run () {
-      adm(['run', cmd], function (err, code) {
-        process.exit(code)
+    if (!file && !require('tty').isatty(0)) {
+      process.stdin.setEncoding('utf8')
+      var code = ''
+      process.stdin.on('data', function (chunk) {    
+        code += chunk
       })
-    }, function dc() { 
-      throw Error('Panic: Hostfs disconnected from vm')
-    })
+      process.stdin.on('end', function() {
+        captureFlags.__NODUX_EVAL__ = code
+        // captureFlags.__NODUX_STDIN_EVAL__ = true
+        console.log(code)
+        run()
+      })
+      return 
+    }
+
+    run()
+
+    function run () {
+      var appInput = file ? process.argv.slice(process.argv.indexOf(file) + 1).join(' ') : ''
+      
+      nativeFlags = nativeFlags.filter(function (f, ix) { 
+        return !~excludeNativeFlags.indexOf(f) //&&
+          // (captureFlags[(nativeFlags[ix-1] || '').replace(/^-+/, '')] !== f)
+      }).join(' ')
+      
+      var envVars = Object.keys(captureFlags).reduce(function (o, f) {
+        if (/__NODUX_(.+)__/.test(f)) {
+          o[f] = captureFlags[f]
+        }
+        return o
+      }, {
+        NODUX_HOST_CWD: cwd,
+        NODUX_HOST_ENV: env
+      })
+
+      if (envVars.__NODUX_PRINT_EVAL_RESULT__) {
+        envVars.__NODUX_EVAL__ = envVars.__NODUX_PRINT_EVAL_RESULT__
+        envVars.__NODUX_PRINT_EVAL_RESULT__ = true
+      }
+
+      fs.writeFileSync(envFile, JSON.stringify(envVars))
+      var pid = 'PID=' + process.pid
+      var cmd = sudo + _ + pid + _ + node + _ + nativeFlags + _ + nodux + _ + file + _ + appInput
+
+      hostfs({host: info.ip, envMapPath: __dirname}, function () {
+        adm(['run', cmd], function (err, code) {
+          process.exit(code)
+        })
+      }, function dc() { 
+        throw Error('Panic: Hostfs disconnected from vm')
+      })
+    }
 
   })
 
@@ -123,14 +155,8 @@ onExit(function () {
   if (fs.existsSync(envFile)) { fs.unlinkSync(envFile) }
 })
 
-function argStr(f, v) {
-  var dash = (f.length === 1) ? '-' : '--'
-  var prefix = (v === false) ? 'no-' : ''
-  var suffix = (typeof v === 'string') ? '=' + v : ''
-  return dash + prefix + f + suffix
-}
-
 function isNativeFlag(f) {
+  return true
   if (f === '_') return false
-  return !!~flags.indexOf(f)
+  return !!~flags.indexOf(f.replace(/^--?/, ''))
 }

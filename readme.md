@@ -99,6 +99,6 @@ the roadmap to solve.
 
 ## Thanks
 
-* [hyperos](https://github.com/maxogden/linux) for trailblazing the concept an npm intallable linux vm and really reducing the learning curve by means of example.
+* [hyperos](https://github.com/maxogden/linux) for trailblazing the concept of an npm installable virtualizer and really reducing the learning curve by means of example.
 * [nearForm](http://nearform.com) for sponsoring development
 * [xhyve](https://github.com/mist64/xhyve) for building an awesome lightweight virtualizer

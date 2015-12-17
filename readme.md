@@ -5,7 +5,7 @@ Run Node on Linux on OS X, seamlessly.
 ![nodux](demo.gif)
 
 * No additional OS/external dependencies
-* Small size, low resource VM - bundled.
+* Small size, low resource virtualizer - bundled.
 * Use exactly like node
 
 ### Requires
@@ -99,5 +99,6 @@ the roadmap to solve.
 
 ## Thanks
 
-* [hyperos](https://github.com/maxogden/linux) for trailblazing the concept and really reducing the learning curve by means of example.
+* [hyperos](https://github.com/maxogden/linux) for trailblazing the concept an npm intallable linux vm and really reducing the learning curve by means of example.
 * [nearForm](http://nearform.com) for sponsoring development
+* [xhyve](https://github.com/mist64/xhyve) for building an awesome lightweight virtualizer

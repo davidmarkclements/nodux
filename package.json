@@ -22,6 +22,7 @@
     "es6-promisify": "^3.0.0",
     "escape-regexp": "0.0.1",
     "hyperfuse": "^0.1.0",
+    "is-sudo": "^0.1.0",
     "keypair": "^1.0.0",
     "keypress": "^0.2.1",
     "minimist": "^1.2.0",

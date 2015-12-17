@@ -6,6 +6,7 @@ var path = require('path')
 var hostfs = require('./hostfs')
 var escapeRx = require('escape-regexp')
 var minimist = require('minimist')
+var isSudo = require('is-sudo')
 var flags = require('./flags')
 var fs = require('fs')
 var spawn = require('child_process').spawn

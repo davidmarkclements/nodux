@@ -1,6 +1,6 @@
 {
   "name": "nodux",
-  "version": "3.0.6",
+  "version": "3.0.7",
   "node-version": "5.2.0",
   "description": "run node in a tiny container",
   "main": "index.js",

@@ -3,3 +3,4 @@ node_modules
 linux
 .nyc-output
 tst
+fxt.js

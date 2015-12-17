@@ -1,6 +1,7 @@
 {
   "name": "nodux",
   "version": "2.6.0",
+  "node-version": "5.2.0",
   "description": "run node in a tiny container",
   "main": "index.js",
   "bin": {
@@ -8,7 +9,7 @@
     "nodux-adm": "./adm.js"
   },
   "scripts": {
-    "test": "babel-tap test",
+    "test": "babel-tap -R spec test",
     "cov": "babel-tap --cov test",
     "postinstall": "nodux-adm init"
   },
@@ -18,24 +19,22 @@
     "cat-names": "^1.0.2",
     "daemonspawn": "^1.0.1",
     "debug": "^2.2.0",
+    "es6-promisify": "^3.0.0",
     "escape-regexp": "0.0.1",
     "hyperfuse": "^0.1.0",
-    "is-sudo": "^0.1.0",
     "keypair": "^1.0.0",
     "keypress": "^0.2.1",
     "minimist": "^1.2.0",
     "mkdirp": "^0.5.1",
     "node-forge": "^0.6.34",
-    "nodux-core": "0.0.9",
+    "nodux-core": "0.0.11",
     "psjson": "^0.1.0",
     "signal-exit": "^2.1.2",
     "ssh-connect-prompt": "0.0.2",
     "sudo": "^1.0.3"
   },
   "devDependencies": {
-    "babel-tap": "davidmarkclements/babel-tap#patch-1",
-    "node-promise-es6": "^0.2.3",
-    "npm-watch": "0.0.1",
+    "babel-tap": "^4.0.0",
     "standard": "^5.2.2"
   }
 }

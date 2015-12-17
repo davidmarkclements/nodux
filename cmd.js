@@ -9,7 +9,6 @@ var minimist = require('minimist')
 var flags = require('./flags')
 var fs = require('fs')
 var spawn = require('child_process').spawn
-var isSudo = require('is-sudo')
 var xhyve = path.join(__dirname, 'xhyve')
 var xhyveStat = fs.statSync(xhyve)
 
@@ -66,26 +65,29 @@ function exec() {
     var file = minimist(process.argv.slice(2))._[0] || ''
     var nativeFlags
 
+
     if (file) {
       nativeFlags = process.argv.slice(2).slice(0, process.argv.indexOf(file) - 2)
     }
 
-
     if (!file) {
       var args = minimist(process.argv.slice(2))
-      nativeFlags = Object.keys(args).filter(isNativeFlag)
+      nativeFlags = Object.keys(args)
 
-      console.log(nativeFlags)
 
       process.argv.slice(2).forEach(function (f) {
-        if (!file && fs.existsSync(path.join(cwd, f))) {
+        if (!file && fs.existsSync(path.resolve(cwd, f))) {
           file = f
         }
       }) 
 
       nativeFlags = nativeFlags.reduce(function(a, f) {
+        if (f === '_') return a
         a.push(f.length === 1 ? '-' + f : '--' + f)
-        a.push(args[f])
+        if (args[f] !== true) {
+          a.push(args[f])  
+        }
+        
         return a
       }, []) 
     }
@@ -94,31 +96,40 @@ function exec() {
       alias: noduxEnvMap
     })
 
-    if (!file && !require('tty').isatty(0)) {
-      process.stdin.setEncoding('utf8')
-      var code = ''
-      process.stdin.on('data', function (chunk) {    
-        code += chunk
-      })
-      process.stdin.on('end', function() {
-        captureFlags.__NODUX_EVAL__ = code
-        // captureFlags.__NODUX_STDIN_EVAL__ = true
-        console.log(code)
-        run()
-      })
-      return 
-    }
+    //TODO: STDIN eval input
+    // if (!file && !require('tty').isatty(0)) {
+    //   process.stdin.setEncoding('utf8')
+    //   var code = ''
+    //   process.stdin.on('data', function (chunk) {    
+    //     code += chunk
+    //   })
+    //   process.stdin.on('end', function() {
+    //     captureFlags.__NODUX_EVAL__ = code
+    //     captureFlags.__NODUX_STDIN_EVAL__ = true
+    //     run()
+    //   })
+    //   return 
+    // }
 
     run()
 
     function run () {
       var appInput = file ? process.argv.slice(process.argv.indexOf(file) + 1).join(' ') : ''
-      
-      nativeFlags = nativeFlags.filter(function (f, ix) { 
-        return !~excludeNativeFlags.indexOf(f) //&&
-          // (captureFlags[(nativeFlags[ix-1] || '').replace(/^-+/, '')] !== f)
-      }).join(' ')
-      
+
+      nativeFlags = nativeFlags
+        .filter(function (f, ix) {
+          var prev = nativeFlags[ix-1]
+          if (prev && prev[0] === '-' && f[0] !== '-') {
+            return !~excludeNativeFlags.indexOf(prev)
+          }
+          return true
+        })
+        .filter(function (f, ix) { 
+          return !~excludeNativeFlags.indexOf(f)
+        })
+        .join(' ')
+
+
       var envVars = Object.keys(captureFlags).reduce(function (o, f) {
         if (/__NODUX_(.+)__/.test(f)) {
           o[f] = captureFlags[f]
@@ -138,13 +149,13 @@ function exec() {
       var pid = 'PID=' + process.pid
       var cmd = sudo + _ + pid + _ + node + _ + nativeFlags + _ + nodux + _ + file + _ + appInput
 
-      hostfs({host: info.ip, envMapPath: __dirname}, function () {
+      function start() {
         adm(['run', cmd], function (err, code) {
           process.exit(code)
         })
-      }, function dc() { 
-        throw Error('Panic: Hostfs disconnected from vm')
-      })
+      }
+
+      hostfs({host: info.ip, envMapPath: __dirname}, start, start)
     }
 
   })
@@ -155,8 +166,3 @@ onExit(function () {
   if (fs.existsSync(envFile)) { fs.unlinkSync(envFile) }
 })
 
-function isNativeFlag(f) {
-  return true
-  if (f === '_') return false
-  return !!~flags.indexOf(f.replace(/^--?/, ''))
-}

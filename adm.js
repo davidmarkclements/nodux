@@ -289,16 +289,27 @@ function adm(cmds, opts, done) {
                   if (process.stdin.setRawMode) {
                     process.stdin.setRawMode(true)
                   }
-                
                   keypress(process.stdin)
                   terminal(stream)  
 
                   stream.removeListener('data', ready)
 
-                  setImmediate(function () {
+                  // console.log('C', c+'')
+
+                  // setImmediate(function () {
                     process.stdin.pipe(stream)
-                    stream.pipe(process.stdout)  
-                  })
+                    stream.once('data', function (c) {
+                      c += ''
+                      if ((c+'').charCodeAt(0) === 13) {
+                        c = c.substr(1)
+                      }
+                      if ((c+'').charCodeAt(0) === 10) {
+                        c = c.substr(1)
+                      }
+                      if (c) { process.stdout.write(c) }
+                      stream.pipe(process.stdout)
+                    })
+                  // })
                   
                 }
               })

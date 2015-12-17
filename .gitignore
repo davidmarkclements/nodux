@@ -1,6 +1,6 @@
 .DS_Store
 node_modules
 linux
-.nyc-output
+.nyc_output
 tst
 fxt.js

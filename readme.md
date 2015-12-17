@@ -1,27 +1,12 @@
 # nodux
 
-Tiny linux containers for rapid, minimal overhead development on OS X.
+Run Node on Linux on OS X, seamlessly.
 
- 
-[![js-standard-style](https://cdn.rawgit.com/feross/standard/master/badge.svg)](https://github.com/feross/standard)
+![nodux](demo.gif)
 
-## IMPLEMENTATION INCOMPLETE - DO NOT USE (YET)
-
-### About
-
-Containers are awesome, Docker is awesome. 
-
-But using docker for local development, particularly on OS X can be arduous, see
-<https://github.com/brikis98/docker-osx-dev> for all the hoops you need to jump through
-to set up a dev environment with Docker and OS X. And once you've done all that.. it's 
-noticeably slow.
-
-Running a Tiny Core Linux vm on the new OS X hypervisor (Hypervisor.framework) turns out
-to be a relatively tiny install and very fast. 
-
-Another benefit of a Linux development container on OS X is the ability to generate Linux
-core files. These (unlike OS X core files) can be passed into [autopsy](http://npmjs.com/autopsy)
-for advanced high and low level introspection.
+* No additional OS/external dependencies
+* Small size, low resource VM - bundled.
+* Use exactly like node
 
 ### Requires
 
@@ -35,49 +20,81 @@ npm install nodux -g
 
 ### Usage
 
-Use nodux in the exact same way you would use the node binary
+Nodux has the exact same functionality as node:
 
 ```
-nodux <file> [args...]
+nodux [node|v8 flags] <file> [args...]
 ```
 
-All node flags are supported.
+This will run node in a small VM running Tiny Core Linux.
 
-If no file is supplied, nodux will open a repl within the container. 
+All node flags are supported (apart from `--r` - coming soon).
 
-There are also some nodux specific arguments
+Just like node, if no file is supplied, `nodux` will open a REPL.
 
-#### ssh argument
+
+### Runtime Environment
+
+* If the VM is not running, it will be booted when `nodux` is called
+* Subsequent calls to `nodux` will run in the same VM
+  * `nodux-adm halt` or `nodux-adm kill` can be used to stop the VM
+* The host file system is emulated inside the VM, and then chrooted into
+  * this means that all filesystem manipulation affects the host file system
+* Environment variables just work: `process.env` refers to host machine environment variables
+* Currently nodux runs Node v5.2.0 - 
+
+### First Run
+
+The `xhyve` binary (included) needs root permissions to 
+access the OS X network layer. On the first run `nodux`
+will ask for a password, these are the steps it performs
+
+* sudo -k (clears sudo cache to ensure we get explicit permission)
+* sudo chown root xhyve (make root own xhyve)
+* sudo chmod +s xhyve (adds the `setuid` bit, which runs xhyve as root without needing sudo)
+
+### Admin
 
 ```
-nodux --ssh <pid>
+$ nodux-adm
+Usage:     nodux-adm <command> [args...]
+
+Commands:
+  init     creates a single linux folder
+  boot     boots up linux from config in ./linux
+  status   checks if linux is running or not
+  ssh      ssh into linux and attaches the session to your terminal
+  run      runs a single command over ssh
+  halt     runs sudo halt in linux, initiating a graceful shutdown
+  kill     immediately ungracefully kills the linux process with SIGKILL
+  pid      get the pid of the linux process
+  ps       print all linux processes running on this machine
 ```
 
-Logs into a nodux vm as per specified pid, if no pid is providing nodux
-will start a vm and ssh into it. 
-
-
-### Example
-
-```
-nodux myfile.js 
-```
-
-## How it works
-
-* Boots a Tiny Core Linux image that has node preinstalled in an xhyve vm
-* Uses hyperfuse within the vm to catch file system operations and routes them back out of the container into the host file system.
-  * files within the folder are written to host *and* vm fs - thus allowing for file system write listeners to trigger within the vm
-  * on the host system files are rsynced into the container to ensure file changes propagate
-    * this is useful for a build pipeline running on the host (transpilation for instance)
-* passes all arguments to the node executable inside the vm
-
-
-## todo 
-
-* keep the vm version of node in sync with the host system node version
-  * perhaps just do this dynamically inside the vm
-
-# Special Thanks
 
 - [hyperos](https://github.com/maxogden/linux) for trailblazing the concept and really reducing the learning curve by means of example.
+
+### Native Modules and Spawning
+
+Node is running in a Linux environment from an OS X file system.
+
+This means any installed modules with native bindings will fail
+inside the VM. Any native bindings need to be recompiled within 
+the VM - this is on the road map.
+
+Additionally, the node process that runs in the VM is chrooted
+to the root of the host system. This means that exec/spawning 
+any common Linux/OS X binary in hosts PATH will fail. Node will attempt to execute the OS X binary on Linux. This is also on
+the roadmap to solve. 
+
+
+### Roadmap
+
+* Multiple node version management
+* Immutable/isolated container mode (ala Docker)
+  * one VM per process
+  * isolated fs
+* native module support
+* process spawning support
+* Configurable chroot (e.g. chroot to __dirname or pwd instead of /)
+

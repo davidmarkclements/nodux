@@ -2,7 +2,7 @@
 
 Run Node on Linux on OS X, seamlessly.
 
-![nodux](demo.gif)
+![nodux](./demo.gif)
 
 * No additional OS/external dependencies
 * Small size, low resource virtualizer - bundled.

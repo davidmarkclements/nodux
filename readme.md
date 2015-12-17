@@ -72,8 +72,6 @@ Commands:
 ```
 
 
-- [hyperos](https://github.com/maxogden/linux) for trailblazing the concept and really reducing the learning curve by means of example.
-
 ### Native Modules and Spawning
 
 Node is running in a Linux environment from an OS X file system.
@@ -98,3 +96,8 @@ the roadmap to solve.
 * process spawning support
 * Configurable chroot (e.g. chroot to __dirname or pwd instead of /)
 
+
+## Thanks
+
+* [hyperos](https://github.com/maxogden/linux) for trailblazing the concept and really reducing the learning curve by means of example.
+* [nearForm](http://nearform.com) for sponsoring development

@@ -37,5 +37,16 @@
   "devDependencies": {
     "babel-tap": "^4.0.0",
     "standard": "^5.2.2"
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davidmarkclements/nodux.git"
+  },
+  "bugs": {
+    "url": "https://github.com/davidmarkclements/nodux/issues"
+  },
+  "homepage": "https://github.com/davidmarkclements/nodux#readme"
 }

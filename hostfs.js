@@ -8,7 +8,7 @@ var debug = require('debug')
 var log = debug('nodux:hostfs')
 
 if (!module.parent) {
-  return hostfs()
+  return hostfs(require('minimist')(process.argv.slice(2)))
 }
 
 module.exports = hostfs

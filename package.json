@@ -28,7 +28,7 @@
     "minimist": "^1.2.0",
     "mkdirp": "^0.5.1",
     "node-forge": "^0.6.34",
-    "nodux-core": "0.0.14",
+    "nodux-core": "0.0.15",
     "psjson": "^0.1.0",
     "signal-exit": "^2.1.2",
     "ssh-connect-prompt": "0.0.2",

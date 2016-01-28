@@ -51,6 +51,7 @@ function adm(cmds, opts, done) {
       '  status     checks if vm is running or not\n' +
       '  npm [args] run npm commands inside the vm, on host cwd (useful for npm rebuild)\n' + 
       '  ssh        sshes into vm and attaches the session to your terminal\n' +
+      '  ssh-cmd    outputs ssh command used to attach session\n' +
       '  ip         get the ip of the vm\n' +
       '  run        runs a single command over ssh\n' +
       '  halt [-f]  runs sudo halt in vm, initiating a graceful shutdown. The -f flag\n' +
@@ -125,6 +126,13 @@ function adm(cmds, opts, done) {
     })
   }
 
+  if (cmd === 'ssh-cmd') {
+    return sshCmd(function (err, cmd) {
+      if (err) throw err
+      console.log(cmd)
+    })
+  }
+
   if (cmd === 'ssh') {
     return ssh()
   }
@@ -165,10 +173,16 @@ function adm(cmds, opts, done) {
   }
 
   if (cmd === 'bin') {
-    return exec('bin')
+    return sshCmd(function (err, args) {
+      args.push('"cat \$(which node)"')
+      var child = proc.spawn('ssh', args)
+      child.stdout.pipe(process.stdout)
+      child.stderr.pipe(process.stderr)
+    }, true)
   }
 
   console.log(cmd, ' is not a valid command')
+
 
   function exec(cmd, cwd) {
     var idx
@@ -293,14 +307,29 @@ function adm(cmds, opts, done) {
     fs.writeFileSync(keyPath + '.pub', ssh)
   }
 
+  function sshArgs(ip, commands) {
+    var args = ['-i', keyPath, '-o', 'StrictHostKeyChecking=no', '-o', 'LogLevel=ERROR', 'tc@' + ip]
+    if (argv.tty || argv.t) args.unshift('-t')
+    if (commands) args = args.concat(commands)
+    return args
+  }
+
+
+  function sshCmd(cb, raw) {
+    ip(function (err, ip) {
+      if (err) return cb(err)
+      if (!ip) err = Error('Error: Could not find ip')
+      if (raw) return cb(err, sshArgs(ip))
+      cb(err, 'ssh ' + sshArgs(ip).join(' '))
+    })
+  }
+
   function ssh (commands) {
     var hostname = fs.readFileSync(linuxHostname).toString()
     parseIp(hostname, function (err, ip) {
       if (err) throw err
       if (!ip) return console.error('Error: Could not find ip for linux hostname', hostname)
-      var args = ['-i', keyPath, '-o', 'StrictHostKeyChecking=no', '-o', 'LogLevel=ERROR', 'tc@' + ip]
-      if (argv.tty || argv.t) args.unshift('-t')
-      if (commands) args = args.concat(commands)
+      var args = sshArgs(ip, commands)
       if (opts.debug) console.error('starting', 'ssh', args)
 
       if (!commands) {

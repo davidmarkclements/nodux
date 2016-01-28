@@ -13,6 +13,7 @@ var psjson = require('psjson')
 var minimist = require('minimist')
 var connect = require('ssh-connect-prompt')
 var keypress = require('keypress')
+var hostfs = require('./hostfs')
 var argv = minimist(process.argv.slice(2), {boolean: true})
 
 if (!module.parent) {
@@ -46,16 +47,19 @@ function adm(cmds, opts, done) {
       'Usage:     nodux adm <command> [args...]\n' +
       '\n' +
       'Commands:\n' +
-      '  init     creates a new ./linux folder in this directory to hold config\n' +
-      '  boot     boots up linux from config in ./linux\n' +
-      '  status   checks if linux is running or not\n' +
-      '  ssh      sshes into linux and attaches the session to your terminal\n' +
-      '  ip       get the ip of the linux vm\n' +
-      '  run      runs a single command over ssh\n' +
-      '  halt     runs sudo halt in linux, initiating a graceful shutdown\n' +
-      '  kill     immediately ungracefully kills the linux process with SIGKILL\n' +
-      '  pid      get the pid of the linux process\n' +
-      '  ps       print all linux processes running on this machine' +
+      '  boot       boots the vm\n' +
+      '  status     checks if vm is running or not\n' +
+      '  npm [args] run npm commands inside the vm, on host cwd (useful for npm rebuild)\n' + 
+      '  ssh        sshes into vm and attaches the session to your terminal\n' +
+      '  ip         get the ip of the vm\n' +
+      '  run        runs a single command over ssh\n' +
+      '  halt [-f]  runs sudo halt in vm, initiating a graceful shutdown. The -f flag\n' +
+      '             immediately ungracefully kills the vm process with SIGKILL\n' +
+      '  pid        get the pid of the vm process\n' +
+      '  kill       run the kill command against a process in the vm\n' +
+      '  ps         run ps command within vm\n' +
+      '  vms        print all vm processes running on this machine \n' +
+      '  bin        output contents of node binary within vm (useful for core dump analysis)' +
       ''
     )
   }
@@ -69,7 +73,6 @@ function adm(cmds, opts, done) {
   }
 
   if (cmd === 'boot') {
-
 
     // ensure linux folder exists
     if (!fs.existsSync(dir)) return console.log('Error: no linux config folder found, run linux init first')
@@ -99,7 +102,7 @@ function adm(cmds, opts, done) {
     return
   }
 
-  if (cmd === 'kill') {
+  if (cmd === 'halt' && argv.f) {
     linuxStatus(function (err, running, pid) {
       if (err) throw err
       if (!running) return console.log('Linux was not running')
@@ -112,16 +115,14 @@ function adm(cmds, opts, done) {
   }
 
   if (cmd === 'ip') {
-    var hostname = fs.readFileSync(linuxHostname).toString()
-    parseIp(hostname, function (err, ip) {
+    return ip(function (err, ip) {
       if (err) {
         if (done) return done(err)
         throw err
       }
       if (done) return done(null, {ip: ip})
-      console.log(ip)
+      console.log(ip)    
     })
-    return
   }
 
   if (cmd === 'ssh') {
@@ -129,20 +130,7 @@ function adm(cmds, opts, done) {
   }
 
   if (cmd === 'run') {
-    // run is special, we want to forward raw args to ssh
-    var runIdx
-    var args = module.parent ? cmds : process.argv;
-
-    for (var i = 0; i < args.length; i++) {
-      if (args[i] === 'run') {
-        runIdx = i
-        break
-      }
-    }
-    // reparse argv so we don't include any run args
-    argv = minimist(args.slice(0, runIdx + 1), {boolean: true})
-
-    return ssh(args.slice(runIdx + 1))
+    return exec('run')
   }
 
   if (cmd === 'halt') {
@@ -150,11 +138,71 @@ function adm(cmds, opts, done) {
     // todo wait till xhyve actually exits
   }
 
-  if (cmd === 'ps') {
-    return ps()
+  if (cmd === 'vms') {
+    return vms()
   }
 
-  console.log(cmd, 'is not a valid command')
+  if (cmd === 'ps') {
+    return exec('ps')
+  }
+
+  if (cmd === 'kill') {
+    return exec('kill')
+  }
+
+  if (cmd === 'npm') {
+
+    return ip(function (err, ip) {
+      if (err) { throw err }
+      
+      hostfs({host: ip}, run, run)
+      
+      function run() {
+        exec('npm', process.cwd())
+      }
+      
+    })
+  }
+
+  if (cmd === 'bin') {
+    return exec('bin')
+  }
+
+  console.log(cmd, ' is not a valid command')
+
+  function exec(cmd, cwd) {
+    var idx
+    var args = module.parent ? cmds : process.argv
+
+    for (var i = 0; i < args.length; i++) {
+      if (args[i] === cmd) {
+        idx = i
+        break
+      }
+    }
+    // reparse argv so we don't include any run args
+    argv = minimist(args.slice(0, idx + 1), {boolean: true})
+
+    var prefix = cmd !== 'run' ? [cmd] : []
+    if (cmd === 'kill') prefix.unshift('sudo')
+
+    if (cmd === 'bin') prefix = ['cat', '$(which node)']
+
+    args = prefix.concat(args.slice(idx + 1))
+
+    if (cwd) {
+      return ssh(['sudo', 'sh', '-c', '"cd /host/' + cwd + '; ' + args.join(' ') + '"'])
+    }
+
+    return ssh(args)
+  }
+
+
+  function ip(cb) {
+    var hostname = fs.readFileSync(linuxHostname).toString()
+    parseIp(hostname, cb)
+  }
+
 
   function getPid () {
     fs.exists(linuxPid, function (exists) {
@@ -393,7 +441,7 @@ function adm(cmds, opts, done) {
     })
   }
 
-  function ps () {
+  function vms() {
     psjson.ps('ps -eaf', function (err, procs) {
       if (err) return console.error(err)
       procs.rows.forEach(function (proc) {

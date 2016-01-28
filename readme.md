@@ -60,15 +60,20 @@ $ nodux-adm
 Usage:     nodux-adm <command> [args...]
 
 Commands:
-  init     creates a single linux folder
-  boot     boots up linux from config in ./linux
-  status   checks if linux is running or not
-  ssh      ssh into linux and attaches the session to your terminal
-  run      runs a single command over ssh
-  halt     runs sudo halt in linux, initiating a graceful shutdown
-  kill     immediately ungracefully kills the linux process with SIGKILL
-  pid      get the pid of the linux process
-  ps       print all linux processes running on this machine
+Commands:
+  boot       boots the vm
+  status     checks if vm is running or not
+  npm [args] run npm commands inside the vm, on host cwd (useful for npm rebuild)
+  ssh        sshes into vm and attaches the session to your terminal
+  ip         get the ip of the vm
+  run        runs a single command over ssh
+  halt [-f]  runs sudo halt in vm, initiating a graceful shutdown. The -f flag
+             immediately ungracefully kills the vm process with SIGKILL
+  pid        get the pid of the vm process
+  kill       run the kill command against a process in the vm
+  ps         run ps command within vm
+  vms        print all vm processes running on this machine
+  bin        output contents of node binary within vm (useful for core dump analysis)
 ```
 
 
@@ -84,6 +89,28 @@ Additionally, the node process that runs in the VM is chrooted
 to the root of the host system. This means that exec/spawning 
 any common Linux/OS X binary in hosts PATH will fail. Node will attempt to execute the OS X binary on Linux. This is also on
 the roadmap to solve. 
+
+### Jailing
+
+*tl;dr* - if you want a core file, use the `--kludge-jail` flag.
+
+Inside the VM, Nodux mounts the host file system, and then chroots into it just before
+executing code - this makes for an apparently seamless environment: we execute on a linux
+machine, but seemingly on the OS X file system. 
+
+However, generating a core file in this context fails. When process abort occurs the underlying C code attempts apply file meta data to the core file that's incompatible with the mounted host file system, so the core file is written but empty. The solution
+to this is to write the core file to a path on the VM filesystem, however since we're in 
+a chroot that can't be done. 
+
+To work around this we supply the `--kludge-jail` flag
+
+```sh
+nodux --kludge-jail thing-that-creates-core-dump.js
+```
+
+Rather than being a true chroot, this simulates a chroot at the JavaScript level by
+taking all sorts of uncouth actions. Essentially then, this allows C/C++ code to still
+access the virtual machine file system - thus allowing a core file to be generated.
 
 
 ### Roadmap

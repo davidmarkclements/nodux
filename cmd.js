@@ -20,10 +20,11 @@ var noduxEnvMap = {
   __NODUX_EVAL__: ['e', 'eval', 'p', 'print'],
   __NODUX_PRINT_EVAL_RESULT__: ['p', 'print'],
   __NODUX_SYNTAX_CHECK_ONLY__: ['c', 'check'],
-  __NODUX_REPL__: ['i']
+  __NODUX_REPL__: ['i'],
+  __NODUX_KLUDGE_JAIL__: ['kludge-jail']
 }
 
-var excludeNativeFlags = ['-e', '--eval', '-p', '--print', '-c', '--check', '-i']
+var excludeNativeFlags = ['-e', '--eval', '-p', '--print', '-c', '--check', '-i', '--kludge-jail']
 
 
 if (xhyveStat.mode !== 36333 || xhyveStat.uid !== 0) {
@@ -63,6 +64,9 @@ function exec() {
     var nodux = '/usr/local/bin/nodux.js'
     var cwd = process.cwd()
     var env = JSON.stringify(process.env)
+
+    process.argv[process.argv.length-1] = require.resolve(path.join(process.cwd(), process.argv[process.argv.length-1]))
+
     var file = minimist(process.argv.slice(2))._[0] || ''
     var nativeFlags
 
@@ -128,6 +132,9 @@ function exec() {
         .filter(function (f, ix) { 
           return !~excludeNativeFlags.indexOf(f)
         })
+        .filter(function (f) {
+          return f !== file
+        })
         .join(' ')
 
 
@@ -146,9 +153,17 @@ function exec() {
         envVars.__NODUX_PRINT_EVAL_RESULT__ = true
       }
 
+
       fs.writeFileSync(envFile, JSON.stringify(envVars))
       var pid = 'PID=' + process.pid
-      var cmd = sudo + _ + pid + _ + node + _ + nativeFlags + _ + nodux + _ + file + _ + appInput
+      var rmCore = 'rm /home/tc/*.core &> /dev/null'
+      var cpCore = 'cp /home/tc/*.core /host' + cwd + ' &> /dev/null'
+      var shc = 'sh -c'
+
+      var cmd = sudo + _ + shc + _ + '"' + rmCore + ';' + pid + _ + node + _ + nativeFlags + _ 
+        + nodux + _ + file + _ + appInput + _ + ';' + _ + cpCore + '"'
+
+      console.log('file: '+ file)
 
       function start() {
         adm(['run', cmd], function (err, code) {

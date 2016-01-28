@@ -163,7 +163,7 @@ function exec() {
       var cmd = sudo + _ + shc + _ + '"' + rmCore + ';' + pid + _ + node + _ + nativeFlags + _ 
         + nodux + _ + file + _ + appInput + _ + ';' + _ + cpCore + '"'
 
-      console.log('file: '+ file)
+      console.log(cmd)
 
       function start() {
         adm(['run', cmd], function (err, code) {

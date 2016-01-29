@@ -65,11 +65,12 @@ function exec() {
     var cwd = process.cwd()
     var env = JSON.stringify(process.env)
 
-    process.argv[process.argv.length-1] = require.resolve(path.join(process.cwd(), process.argv[process.argv.length-1]))
+    if (!/^--.+|nodux/.test(process.argv[process.argv.length-1])) {
+      process.argv[process.argv.length-1] = require.resolve(path.join(process.cwd(), process.argv[process.argv.length-1]))
+    }
 
     var file = minimist(process.argv.slice(2))._[0] || ''
     var nativeFlags
-
 
     if (file) {
       nativeFlags = process.argv.slice(2).slice(0, process.argv.indexOf(file) - 2)
@@ -162,8 +163,6 @@ function exec() {
 
       var cmd = sudo + _ + shc + _ + '"' + rmCore + ';' + pid + _ + node + _ + nativeFlags + _ 
         + nodux + _ + file + _ + appInput + _ + ';' + _ + cpCore + '"'
-
-      console.log(cmd)
 
       function start() {
         adm(['run', cmd], function (err, code) {

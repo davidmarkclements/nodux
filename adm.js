@@ -175,9 +175,9 @@ function adm(cmds, opts, done) {
   if (cmd === 'bin') {
     return sshCmd(function (err, args) {
       args.push('"cat \$(which node)"')
-      var child = proc.spawn('ssh', args)
-      child.stdout.pipe(process.stdout)
-      child.stderr.pipe(process.stderr)
+      var bin = child.spawn('ssh', args)
+      bin.stdout.pipe(process.stdout)
+      bin.stderr.pipe(process.stderr)
     }, true)
   }
 
